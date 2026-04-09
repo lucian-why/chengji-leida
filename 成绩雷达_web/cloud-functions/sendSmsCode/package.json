@@ -1,0 +1,1 @@
+{"name": "sendSmsCode", "version": "1.0.0", "description": "发送短信验证码", "main": "index.js", "dependencies": {"@cloudbase/node-sdk": "^2.0.0", "tencentcloud-sdk-nodejs": "^4.0.0"}}

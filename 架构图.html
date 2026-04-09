@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>成绩雷达 Web 版 - 项目架构图</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600&display=swap');
+  
+  * { margin:0; padding:0; box-sizing:border-box; }
+  
+  body {
+    font-family: 'Noto Sans SC', sans-serif;
+    background: #0f0f1a;
+    color: #e0e0e8;
+    min-height:100vh;
+    padding: 40px 20px;
+  }
+
+  .page-title {
+    text-align: center;
+    font-family: 'Noto Serif SC', serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 6px;
+    letter-spacing: 3px;
+  }
+  .page-subtitle {
+    text-align: center;
+    font-size: 1rem;
+    color: #7a8899;
+    margin-bottom: 36px;
+  }
+
+  .container {
+    max-width: 1300px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ===== 卡片通用样式 ===== */
+  .card {
+    background: linear-gradient(145deg, #1a1b2e 0%, #16172a 100%);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .card-icon {
+    font-size: 1.8rem;
+    width: 42px; height: 42px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:12px; font-weight:700;
+  }
+  .card-title { font-size: 1.2rem; font-weight: 600; color:#fff; }
+  .card-badge {
+    margin-left:auto; padding:4px 12px; border-radius:999px;
+    font-size:0.75rem; font-weight:500;
+  }
+  .card-body { font-size:0.9rem; line-height: 1.7; color:#b8c8d0; }
+
+  /* ===== 颜色系统 ===== */
+  .bg-blue   { background:rgba(80,140,220,0.18); border-color: rgba(80,140,220,0.3); color:#5aadff; }
+  .bg-green  { background: rgba(70,200,130,0.15); border-color: rgba(70,200,130,0.28); color:#46d9a0; }
+  .bg-purple { background: rgba(160,120,230,0.15); border-color: rgba(160,120,230,0.28); color:#a78bff; }
+  .bg-orange { background: rgba(230,150,80,0.15); border-color: rgba(230,150,80,0.28); #ffb86c; }
+  .bg-red    { background: rgba(240,100,120,0.15); border-color: rgba(240,100,120,0.28); #ff6b8a; }
+  .bg-cyan   { background: rgba(80,200,210,0.15); border-color: rgba(80,200,210,0.28); #50c9d0; }
+  .bg-pink   { background: rgba(230,130,180,0.15); border-color: rgba(230,130,180,0.28); #f783ac; }
+
+  /* ===== 架构图布局 ===== */
+  .arch-layer {
+    display:flex; gap:20px; align-items: stretch;
+  }
+  .arch-col {
+    flex:1; display:flex; flex-direction:column; gap:16px;
+    min-width:0;
+  }
+  .arch-box {
+    border-radius:14px; padding:18px 20px;
+    position:relative; transition: transform 0.2s;
+    border:1px solid;
+  }
+  .arch-box:hover { transform: translateY(-2px); }
+  .arch-box-title {
+    font-size:0.85rem; font-weight:600; margin-bottom:10px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .arch-box-content { font-size:0.82rem; color:#9aa8b8; line-height:1.65; }
+
+  /* 箭头连接线 */
+  .arrow-connector {
+    display:flex; align-items:center; justify-content:center;
+    padding:0 8px; font-size:1.4rem; color:#555; min-width:40px;
+  }
+  .arrow-connector::after { content:'→'; }
+
+  /* 模块网格 */
+  .module-grid {
+    display:grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr));
+    gap:10px;
+  }
+  .module-item {
+    background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);
+    border-radius:10px; padding:12px 14px; text-align:center;
+    transition: all 0.2s;
+  }
+  .module-item:hover { background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.15); }
+  .module-name { font-size:0.82rem; font-weight:600; color:#dde0e8; margin-bottom:4px; }
+  .module-desc { font-size:0.72rem; color: #6a7a8a; }
+  .module-size { font-size:0.68rem; color:#556; margin-top:4px; opacity:0.7; }
+
+  /* 云函数表格 */
+  .func-table { width:100%; border-collapse:collapse; margin-top:8px; }
+  .func-table th { 
+    text-align:left; padding:8px 10px; font-size:0.8rem; font-weight:600;
+    color:#aab; border-bottom:2px solid rgba(255,255,255,0.08); 
+  }
+  .func-table td { 
+    padding:7px 10px; font-size:0.8rem; color:#8a9ab0; border-bottom:1px solid rgba(255,255,255,0.04);
+  }
+  .func-tag { 
+    display:inline-block; padding:2px 8px; border-radius:6px; 
+    font-size:0.7rem; font-weight:500; margin-right:4px;
+  }
+  .tag-auth { background:rgba(90,140,230,0.15); color:#6ea0ff; }
+  .tag-sync { background:rgba(70,200,130,0.15); color:#46d9a0; }
+  .tag-user { background:rgba(230,150,80,0.15); color:#ffb86c; }
+
+  /* 数据流图 */
+  .data-flow { 
+    display:flex; flex-direction:column; gap:12px; 
+    align-items:center; 
+  }
+  .flow-row { display:flex; align-items:center; gap:12px; width:100%; }
+  .flow-node {
+    background:linear-gradient(135deg, rgba(80,140,220,0.12), rgba(80,140,220,0.04));
+    border:1px solid rgba(80,140,220,0.25); border-radius:10px;
+    padding:10px 16px; font-size:0.82rem; font-weight:500; color:#7ab8ff;
+    white-space:nowrap;
+  }
+  .flow-arrow { font-size:1.2rem; color:#556; }
+
+  /* 技术栈标签 */
+  .tech-stack {
+    display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;
+  }
+  .tech-tag {
+    padding:5px 12px; border-radius:8px; font-size:0.78rem;
+    font-weight:500; background:rgba(255,255,255,0.05);
+    border:1px solid rgba(255,255,255,0.1); color:#b8c8d0;
+  }
+
+  /* 统计数字 */
+  .stats-row { display:flex; gap:16px; flex-wrap:wrap; }
+  .stat-box {
+    background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);
+    border-radius:12px; padding:16px 20px; text-align:center; flex:1; min-width:120px;
+  }
+  .stat-num { font-size:1.8rem; font-weight:700; color:#fff; }
+  .stat-label { font-size:0.8rem; color:#6a7a8a; margin-top:4px; }
+
+  /* 文件树 */
+  .file-tree { 
+    font-family:'Cascadia Code', 'Consolas', monospace; font-size:0.78rem;
+    background:rgba(0,0,0,0.3); border-radius:10px; 
+    padding:16px 20px; overflow-x:auto; line-height:1.65; color:#a8b8c8;
+  }
+  .ft-dir { color:#7ad; }
+  .ft-file { color:#9ac; }
+  .ft-icon { color:#667; margin-right:4px; }
+
+  /* 响应式 */
+  @media (max-width:900px) {
+    .arch-layer { flex-direction:column; }
+    .arrow-connector { padding: 8px 0; }
+    .arrow-connector::after { content:'↓'; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">🎯 成绩雷达</div>
+<div class="page-subtitle">Web 版 · 项目架构总览 · 可截图分享</div>
+
+<div class="container">
+
+  <!-- ===== 统计概览 ===== -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-icon bg-blue">📊</span>
+      <span class="card-title">项目概况</span>
+      <span class="card-badge bg-green">v2.0.0</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-num">21</div><div class="stat-label">前端模块</div></div>
+      <div class="stat-box"><div class="stat-num">17</div><div class="stat-label">云函数</div></div>
+      <div class="stat-box"><div class="stat-num">~275KB</div><div class="stat-label">源码总量</div></div>
+      <div class="stat-box"><div class="stat-num">3</div><div="stat-label">数据库集合</div></div>
+    </div>
+    <div class="card-body" style="margin-top:16px;">
+        <strong>技术栈：</strong>
+        <div class="tech-stack">
+          <span class="tech-tag">Vite 6</span>
+          <span class="tech-tag">ES Module</span>
+          <span class="tech-tag">Chart.js 4</span>
+          <span class="tech-tag">SheetJS (xlsx)</span>
+          <span class="tech-tag">html2canvas</span>
+          <span class="tech-tag">腾讯云 Cloudbase</span>
+          <span class="tech-tag">Node.js 18</span>
+          <span class="tech-tag">bcryptjs</span>
+          <span class="tech-tag">nodemailer (SMTP)</span>
+          <span class="tech-tag">腾讯云 SMS API</span>
+        </div>
+    </div>
+  </div>
+
+  <!-- ===== 整体架构分层 ===== -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-icon bg-purple">🏗️</span>
+      <span class="card-title">整体架构 — 三层分离</span>
+    </div>
+    <div class="arch-layer">
+      <!-- 左列 -->
+      <div class="arch-col">
+        <div class="arch-box bg-blue" style="border-left-width:3px;">
+          <div class="arch-box-title">🌐 浏览器端（Frontend）</div>
+          <div class="arch-box-content">
+            <strong>入口：</strong>index.html<br>
+            <strong>构建：</strong>Vite → vite-plugin-singlefile → 单文件 HTML<br>
+            <strong>部署：</strong>GitHub Pages（静态托管）<br>
+            <br>
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);">
+            <strong>核心职责：</strong><br>
+            • UI 渲染与交互（登录/考试/图表/设置）<br>
+            • 本地数据持久化（localStorage）<br>
+            • 图表绘制（Chart.js 雷达图/趋势图）<br>
+            • Excel 导入导出 / 分享报告截图
+          </div>
+          </div>
+        </div>
+
+        <div class="arch-box bg-cyan" style="border-left-width:3px;">
+          <div class="arch-box-title">☁️ 云函数层（Backend）</div>
+          <div class="arch-box-content">
+            <strong>运行时：</strong>Node.js 18.15<br>
+            <strong>框架：</strong>@cloudbase/node-sdk<br>
+            <strong>触发方式：</strong>前端 callFunction 调用<br>
+            <br>
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);">
+            <strong>核心职责：</strong><br>
+            • 用户认证（注册/登录/Token）<br>
+            • 验证码发送（邮件 SMTP / 腾讯云 SMS）<br>
+            • 云端档案 CRUD（备份/恢复/删除）
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 中间箭头 -->
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:0 10px;">
+        <div class="flow-arrow">↕ HTTPS / callFunction</div>
+        <div style="font-size:0.75rem;color:#556;text-align:center;">腾讯云<br>Cloudbase</div>
+        <div class="flow-arrow">↕ SDK</div>
+      </div>
+
+      <!-- 右列 -->
+      <div class="arch-col">
+        <div class="arch-box bg-orange" style="border-left-width:3px;">
+          <div class="arch-box-title">🗄️ 数据库层（Database）</div>
+          <div class="arch-box-content">
+            <strong>类型：</strong>文档数据库（NoSQL）<br>
+            <strong>服务：</strong>腾讯云开发环境<br>
+            <br>
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,255,0.08);">
+              <code style="background:rgba(255,100,100,0.1);padding:2px 6px;border-radius:4px;font-size:0.8em;color:#ff8888;">users</code> 
+              用户账号表（邮箱/手机号/密码哈希/Token）<br><br>
+              <code style="background:rgba(100,100,255,0.1);padding:2px 6px;border-radius:4px;font-size:0.8em;">cloud_profiles</code>
+              云端档案表（用户备份数据）<br><br>
+              <code style="background:rgba(100,255,100,0.1);padding:2px 6px;border-radius:4px;font-size:0.8em;">email_codes</code>
+              邮箱验证码（5分钟有效）<br><br>
+              <code style="background:rgba(255,200,100,0.1);padding:2px 6px;border-radius:4px;font-size:0.8em;">sms_codes</code>
+              短信验证码（5分钟有效）
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 前端模块详情 ===== -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-icon bg-green">⚡️</span>
+      <span class="card-title">前端模块架构（src/ 目录）</span>
+    </div>
+    <div class="module-grid">
+      <div class="module-item">
+        <div class="module-name">📱 app.js</div>
+        <div class="module-desc">应用主入口，编排所有模块</div>
+        <div class="module-size">11.6 KB · 核心</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">🔐 auth.js</div>
+        <div class="module-desc">认证中间层，封装统一 Auth API</div>
+        <div class="module-size">7.4 KB</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">☁️ cloud-tcb.js</div>
+        <div class="module-desc">TCB SDK 封装层（核心通信层）</div>
+        <div class="module-size">25.8 KB · 最重</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">💾 storage.js</div>
+        <div class="module-desc">数据持久化层（localStorage CRUD）</div>
+        <div class="module-size">8.6 KB</div>
+      </div>
+      <div class module-item>
+        <div class="module-name">🎨 styles.css</div>
+        <div class="module-desc">全局样式单文件（2768 行）</div>
+        <div class="module-size">56.8 KB · 最大</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">🔑 login-ui.js</div>
+        <div class="module-desc">登录/注册 UI 及交互逻辑</div>
+        <div class="module-size">33.3 KB</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">📝 exam-detail.js</div>
+        <div class="module-desc">考试详情页渲染与表单处理</div>
+        <div class="module-size">22.9 KB</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">📊 chart-radar.js</div>
+        <div class="module-desc">雷达图（科目对比分析）</div>
+        <div class="module-size">11.4 KB</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">📈 chart-trend.js</div>
+        <div class="module-desc">趋势图（分数/排名趋势）</div>
+        <div class="module-size">11.1 KB</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">🔍 cloud-sync-ui.js</div>
+        <div class="module-desc">云端同步 UI 面板</div>
+        <div class="module-size">12.8 KB</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">☁️ cloud-sync.js</div>
+        <div class="module-desc">云端同步核心逻辑</div>
+        <div class="module-size">5.9 KB</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">📤 report.js</div>
+        <div class="module-desc">分享报告（html2canvas 截图）</div>
+        <div class="module-size">17.5 KB</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">📥 import-export.js</div>
+        <div class="module-desc">Excel 导入导出</div>
+        <div class="module-size">9.2 KB</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">📋 batch.js</div>
+        <div class="module-desc">批量填写成绩功能</div>
+        <div class="module-size">7.1 KB</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">📂 profile.js</div>
+        <div class="module-desc">档案管理（切换/新建/删除）</div>
+        <div class="module-size">9.3 KB</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">📋 exam-list.js</div>
+        <div class="module-desc">侧边栏考试列表渲染</div>
+        <div class="module-size">5.0 KB</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">🔎 chart-zoom.js</div>
+        <div class="module-desc">图表放大弹窗</div>
+        <div class="module-size">12.7 KB</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">🎮 demo-data.js</div>
+        <div class="module-desc">示例数据生成</div>
+        <div class="module-size">8.7 KB</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">🔧 store.js</div>
+        <div class="module-desc">全局状态管理（集中式）</div>
+        <div class="module-size">1.2 KB · 最轻量</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">🛠 utils.js</div>
+        <div class="module">工具函数库（HTML转义/分数计算等）</div>
+        <div class="module-size">2.2 KB</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">💬 modal.js</div>
+        <div class="module-desc">弹窗系统（确认/提示 Toast）</div>
+        <div class="module-size">2.6 KB</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 云函数清单 ===== -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-icon bg-red">☁️</span>
+      <span class="card-title">云函数清单（17 个）</span>
+    </div>
+    <table class="func-table">
+      <thead>
+        <tr>
+          <th>云函数名</th>
+          <th>功能分类</th>
+          <th>关键依赖</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>sendEmailCode</code></td><td><span class="func-tag tag-auth">认证</span> 发送邮箱验证码</td><td>nodemailer + email_codes</td></tr>
+        <tr><td><code>sendSmsCode</code></td><td><span class="func-tag tag-auth">认证</span> 发送短信验证码</td><td>tencentcloud-sdk + sms_codes</td></tr>
+        <tr><td><code>emailRegister</code></td><td><span class="func-tag tag-auth">认证</span> 邮箱验证码注册</td><td>bcryptjs + users</td></tr>
+        <tr><td><code>phoneRegister</code></td><td><span class="func-tag tag-auth">认证</span> 手机号验证码注册</td><td>bcryptjs + users</td></tr>
+        <tr><td><code>passwordLogin</code></td><td><span class="func-tag tag-auth">认证</span> 邮箱密码登录</td><td>bcryptjs + users</td></tr>
+        <tr><td><code>phonePasswordLogin</code></td><td><span class="func-tag tag-auth">认证</span> 手机号密码登录</td><td>bcryptjs + users</td></tr>
+        <tr><td><code>emailLogin</code></td><td><span class="func-tag tag-auth">认证</span> 邮箱验证码登录</td><td>email_codes + users</td></tr>
+        <tr><td><code>phoneLogin</code></td><td><span class="func-tag tag-auth">认证</span> 手机号验证码登录</td><td>sms_codes + auth SDK</td></tr>
+        <tr><td><code>resetPassword</code></td><td><span class="func-tag tag-auth">认证</span> 邮箱重置密码</td><td>bcryptjs + email_codes</td></tr>
+        <tr><td><code>phoneResetPassword</code></td><td><span class="func-tag tag-auth">认证</span> 手机重置密码</td><td>bcryptjs + sms_codes</td></tr>
+        <tr><td><code>verifyToken</code></td><td><span class="func-tag tag-auth">认证</span> 校验 Token 有效性</td><td>users 表</td></tr>
+        <tr><td><code>updateNickname</code></td><td><span class="func-tag tag-user">用户</span> 更新用户昵称</td><td>users 表</td></tr>
+        <tr><td><code>listCloudProfiles</code></td><td><span class="func-tag tag-sync">同步</span> 列出云端档案</td><td>cloud_profiles</td></tr>
+        <tr><td><code>getCloudProfileData</code></td><td><span class="func-tag tag-sync">同步</span> 获取档案详情</td><td>cloud_profiles</td></tr>
+        <tr><td><code>uploadCloudProfile</code></td><td><span class="func-tag tag-sync">同步</span> 上传档案到云端</td><td>cloud_profiles</td></tr>
+        <tr><td><code>deleteCloudProfiles</code></td><td><span class="func-tag tag-sync">同步</span> 删除云端档案</td><td>cloud_profiles</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===== 数据流图 ===== -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-icon bg-pink">🔄</span>
+      <span class="card-title">核心数据流</span>
+    </div>
+    <div class="data-flow">
+      <div class="flow-row">
+        <div class="flow-node" style="background:rgba(232,168,124,0.15);border-color:rgba(232,168,124,0.3);color:#e8a87c;">👤 用户操作</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node" style="background:rgba(124,169,201,0.15);border-color:rgba(124,169,201,0.3);color:#7ca9c9;">login-ui.js</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node" style="background:rgba(124,169,201,0.15);border-color:rgba(124,169,201,0.3);color:#7ca9c9;">auth.js</div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-arrow" style="color:#7ca9c9;">↘ callFunction ↘</div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-node" style="background:rgba(70,185,139,0.15);border-color:rgba(70,185,139,0.3);color:#46d9a0;">cloud-tcb.js</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node" style="background:rgba(160,120,230,0.15);border-color:rgba(160,120,230,0.3);color:#a78bff;">云函数</div>
+        <div class="flow-arrow">↔</div>
+        <div class="flow-node" style="background:rgba(230,150,80,0.15);border-color:rgba(230,150,80,0.3);color:#ffb86c6;">数据库</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 功能特性 ===== -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-icon bg-blue">✨</span>
+      <span class="card-title">核心功能特性</span>
+    </div>
+    <div class="module-grid">
+      <div class="module-item">
+        <div class="module-name">🔐 多方式登录</div>
+        <div class="module-desc">邮箱/手机号 + 密码或验证码<br>智能识别输入类型</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">📂 多档案管理</div>
+        <div class="module-desc">独立成绩空间<br>支持新建/切换/删除</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">📝 成绩录入</div>
+        <div class="module-desc">单个/批量录入<br>科目卡片式展示</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">📊 雷达图对比</div>
+        <div class="module-desc">多场考试科目得分率对比<br>最强/最弱科目分析</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">📈 趋势追踪</div>
+        <div class="module-desc">分数趋势 / 排名趋势<br>按科目或总分查看</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">☁️ 云端同步</div>
+        <div class="module-desc">本地 ↔ 云端双向同步<br>冲突检测与合并策略</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">📤 分享报告</div>
+        <div class="module-desc">html2canvas 截图生成<br>考试报告 / 档案总览</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">📥 Excel 导入导出</div>
+        <div class="module-desc">SheetJS 解析 Excel<br>.xlsx 格式导出</div>
+      </div>
+      <div class="module-item">
+        <div class="module-name">🚫 排除考试</div>
+        <div class="module-desc">不计入统计的趋势/雷达图<br>手动总分覆盖</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 底部说明 ===== -->
+  <div style="text-align:center; padding:20px; color:#556; font-size:0.82rem; line-height:1.8;">
+    <p><strong>成绩雷达 (chengjiguanjia) v2.0</strong> — 记录每一步进步 ✨</p>
+    <p>构建工具：Vite 6 + vite-plugin-singlefile · 部署：GitHub Pages</p>
+    <p>后端：腾讯云 Cloudbase (Node.js 18) · 前端：原生 ES Module + Chart.js 4</p>
+    <p style="margin-top:8px; color:#445;">截图可分享给他人展示项目架构</p>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "redeemInviteCode",
+  "version": "1.0.0",
+  "description": "邀请码兑换（云端校验，一码一人）",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^2.6.0"
+  }
+}

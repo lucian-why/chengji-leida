@@ -1,0 +1,1 @@
+{"name": "verifyToken", "version": "1.0.0", "description": "成绩雷达 - Token 校验", "main": "index.js", "dependencies": {"@cloudbase/node-sdk": "^2.6.0"}}

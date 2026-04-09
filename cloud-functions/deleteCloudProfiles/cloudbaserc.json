@@ -1,0 +1,14 @@
+{
+  "envId": "{{env.ENV_ID}}",
+  "functionRoot": "./functions",
+  "functions": [],
+  "ai": {
+    "defaultAgent": "{{env.AI_DEFAULT_AGENT}}",
+    "agents": {
+      "codebuddy": {
+        "type": "custom",
+        "apiKey": "{{env.CODEBUDDY_API_KEY}}"
+      }
+    }
+  }
+}
