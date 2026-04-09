@@ -45,6 +45,17 @@ async function getDeletedCloudProfiles() {
 
 async function uploadProfile(profileId) {
   const user = ensureLoggedIn();
+
+  // 校验数据归属
+  const profiles = storage.getProfiles();
+  const profileMeta = profiles.find(p => p.id === profileId);
+  if (profileMeta?.isDemo) {
+    return { skipped: true, reason: '示例档案不上传' };
+  }
+  if (profileMeta?.ownerId && profileMeta.ownerId !== user.id) {
+    throw new Error('该档案不属于当前账号，无法上传');
+  }
+
   const bundleInfo = storage.getLocalProfileBundle(profileId);
   if (!bundleInfo) {
     throw new Error('未找到要上传的本地档案');
@@ -95,7 +106,7 @@ async function downloadProfile(cloudProfileId, targetProfileId, targetProfileNam
     }
   }
 
-  storage.applyCloudProfileBundle(payload);
+  storage.applyCloudProfileBundle(payload, user.id);
   return data;
 }
 
@@ -144,6 +155,35 @@ async function purgeDeletedProfiles(profileIds) {
   return unwrapResult(result, '彻底删除档案失败');
 }
 
+/**
+ * 归档孤儿档案到当前账号的回收站，并从本地删除
+ */
+async function archiveOrphanProfiles(currentUserId) {
+  const removedBundles = storage.removeOrphanProfiles(currentUserId);
+  if (removedBundles.length === 0) return 0;
+
+  let archivedCount = 0;
+  for (const bundle of removedBundles) {
+    try {
+      const result = await callFunction('uploadCloudProfile', {
+        profileId: bundle.profileId,
+        profileName: bundle.profileName,
+        profileData: bundle.bundle,
+        examCount: bundle.examCount,
+        dataSize: bundle.dataSize,
+        userId: currentUserId,
+        deleted: true,
+        deletedAt: new Date().toISOString()
+      });
+      archivedCount++;
+    } catch (err) {
+      console.warn('[cloudSync] 归档档案到回收站失败:', bundle.profileName, err && err.message || err);
+    }
+  }
+
+  return archivedCount;
+}
+
 module.exports = {
   getCloudProfiles,
   getDeletedCloudProfiles,
@@ -151,5 +191,6 @@ module.exports = {
   downloadProfile,
   deleteCloudProfiles,
   restoreDeletedProfiles,
-  purgeDeletedProfiles
+  purgeDeletedProfiles,
+  archiveOrphanProfiles
 };

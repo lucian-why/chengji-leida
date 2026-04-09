@@ -80,13 +80,16 @@ function createProfile(name, options) {
   const profiles = getProfiles();
   const id = options?.fixedId || `profile_${Date.now()}`;
   const isDemo = !!options?.isDemo;
+  const ownerId = options?.ownerId || '';
   if (profiles.find((p) => p.id === id)) return id;
-  profiles.push({
+  const profile = {
     id,
     name,
     isDemo,
     createdAt: new Date().toISOString()
-  });
+  };
+  if (ownerId) profile.ownerId = ownerId;
+  profiles.push(profile);
   saveProfiles(profiles);
   return id;
 }
@@ -302,7 +305,7 @@ function mergeExamLists(localExams = [], cloudExams = []) {
   return Array.from(examMap.values()).sort((a, b) => getExamTimestamp(b) - getExamTimestamp(a));
 }
 
-function applyCloudProfileBundle(cloudBundle) {
+function applyCloudProfileBundle(cloudBundle, currentUserId) {
   const payload = cloudBundle?.profile_data || cloudBundle?.bundle || cloudBundle;
   if (!payload?.profile) {
     throw new Error('云端档案数据结构无效');
@@ -316,6 +319,8 @@ function applyCloudProfileBundle(cloudBundle) {
   const localProfiles = getProfiles();
   const localExams = getExamsAll();
   const incomingProfile = { ...payload.profile };
+  // 云端数据标记当前用户归属
+  if (currentUserId) incomingProfile.ownerId = currentUserId;
   const incomingExams = (payload.exams || []).map((exam) => ({ ...exam, profileId: incomingProfile.id }));
   const existingProfileIndex = localProfiles.findIndex((profile) => profile.id === incomingProfile.id);
 
@@ -338,6 +343,79 @@ function applyCloudProfileBundle(cloudBundle) {
   saveProfiles(localProfiles);
   saveExamsAll(otherExams.concat(mergedProfileExams));
   setProfileMemory(incomingProfile.id, payload.formMemory || {});
+}
+
+// ==================== 数据归属与孤儿档案管理 ====================
+
+/**
+ * 检测本地是否存在孤儿档案（非demo且ownerId与当前用户不匹配的档案）
+ */
+function detectOrphanProfiles(currentUserId) {
+  const profiles = getProfiles();
+  const orphanProfiles = profiles.filter(p => !p.isDemo && (!p.ownerId || p.ownerId !== currentUserId));
+
+  if (orphanProfiles.length === 0) {
+    return { hasOrphans: false, orphanProfiles: [], orphanExamCount: 0 };
+  }
+
+  const allExams = getExamsAll();
+  const orphanIds = new Set(orphanProfiles.map(p => p.id));
+  const orphanExamCount = allExams.filter(e => orphanIds.has(e.profileId)).length;
+
+  return { hasOrphans: true, orphanProfiles, orphanExamCount };
+}
+
+/**
+ * 将孤儿档案认领到当前账号（标记 ownerId）
+ */
+function claimOrphanProfiles(currentUserId) {
+  const profiles = getProfiles();
+  let changed = false;
+  profiles.forEach(p => {
+    if (!p.isDemo && (!p.ownerId || p.ownerId !== currentUserId)) {
+      p.ownerId = currentUserId;
+      changed = true;
+    }
+  });
+  if (changed) {
+    saveProfiles(profiles);
+  }
+}
+
+/**
+ * 将孤儿档案从本地清除（选"不同步"时调用）
+ * 返回被清除的 bundle 列表，供上传到回收站使用
+ */
+function removeOrphanProfiles(currentUserId) {
+  const profiles = getProfiles();
+  const orphanProfiles = profiles.filter(p => !p.isDemo && (!p.ownerId || p.ownerId !== currentUserId));
+
+  if (orphanProfiles.length === 0) return [];
+
+  // 收集被清除的 bundle
+  const removedBundles = orphanProfiles.map(p => getLocalProfileBundle(p.id)).filter(Boolean);
+
+  // 清除 orphan 档案和考试
+  const orphanIds = new Set(orphanProfiles.map(p => p.id));
+  const remainingProfiles = profiles.filter(p => !orphanIds.has(p.id));
+  const remainingExams = getExamsAll().filter(e => !orphanIds.has(e.profileId));
+
+  // 清除 form memory
+  const memory = getFormMemoryAll();
+  orphanIds.forEach(id => delete memory[id]);
+
+  saveProfiles(remainingProfiles);
+  saveExamsAll(remainingExams);
+  saveFormMemoryAll(memory);
+
+  // 重置活跃档案
+  const activeId = getActiveProfileId();
+  if (orphanIds.has(activeId)) {
+    setActiveProfileId(remainingProfiles.length > 0 ? remainingProfiles[0].id : '');
+  }
+
+  notifyChange({ type: 'orphan-removed' });
+  return removedBundles;
 }
 
 module.exports = {
@@ -370,5 +448,8 @@ module.exports = {
   mergeExamLists,
   applyCloudProfileBundle,
   setStorageSyncHooks,
-  setSilentMode
+  setSilentMode,
+  detectOrphanProfiles,
+  claimOrphanProfiles,
+  removeOrphanProfiles
 };

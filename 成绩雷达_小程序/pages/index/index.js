@@ -747,6 +747,17 @@ Page({
       }
 
       this._syncAuthState();
+
+      // 登录后检测孤儿档案
+      const user = auth.getCurrentUser();
+      if (user && user.id) {
+        const { hasOrphans, orphanProfiles, orphanExamCount } = storage.detectOrphanProfiles(user.id);
+        if (hasOrphans) {
+          const profileNames = orphanProfiles.map(p => p.name).join('、');
+          this._showOrphanDataDialog(profileNames, orphanExamCount, user.id);
+        }
+      }
+
       await autoSync.syncAfterLogin();
       // 登录后重新检查 AI 分析状态
       if (typeof this._refreshAnalysis === 'function') {
@@ -1025,6 +1036,37 @@ Page({
 
   onInviteCodeInput(e) {
     this.setData({ inviteCode: e.detail.value });
+  },
+
+  /**
+   * 显示孤儿档案选择对话框
+   */
+  _showOrphanDataDialog(profileNames, examCount, userId) {
+    wx.showModal({
+      title: '发现本地数据',
+      content: `检测到「${profileNames}」共 ${examCount} 条成绩，是否同步到当前账号？`,
+      confirmText: '同步到账号',
+      cancelText: '移入回收站',
+      success: async (res) => {
+        if (res.confirm) {
+          // 认领到当前账号
+          storage.claimOrphanProfiles(userId);
+          wx.showToast({ title: '数据已同步到当前账号', icon: 'success' });
+        } else if (res.cancel) {
+          // 归档到回收站，本地清除
+          wx.showLoading({ title: '归档中...' });
+          try {
+            const archived = await cloudSync.archiveOrphanProfiles(userId);
+            wx.hideLoading();
+            wx.showToast({ title: `${archived} 个档案已移入回收站`, icon: 'success' });
+            this._syncAuthState();
+          } catch (err) {
+            wx.hideLoading();
+            wx.showToast({ title: '归档失败', icon: 'none' });
+          }
+        }
+      }
+    });
   },
 
   async submitInviteCode() {
