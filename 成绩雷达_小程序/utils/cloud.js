@@ -21,7 +21,27 @@ function initCloud() {
 }
 
 function normalizeTimeoutError(name, timeout) {
-  return new Error(`云函数 ${name} 调用超时（${timeout / 1000}s），已切换到本地兜底逻辑`);
+  return new Error(`云函数 ${name} 调用超时（${timeout / 1000}s），请稍后重试`);
+}
+
+function normalizeCloudCallError(name, error) {
+  const rawMessage = String(error?.errMsg || error?.message || error || '');
+  const requestId = error?.requestID || error?.requestId || '';
+  const suffix = requestId ? `（requestId: ${requestId}）` : '';
+
+  if (/errCode:\s*-601002/i.test(rawMessage) || /system error/i.test(rawMessage)) {
+    return new Error(`云端服务暂时不稳定，请稍后再试${suffix}`);
+  }
+
+  if (/cloud\.callFunction:fail/i.test(rawMessage)) {
+    return new Error(`云函数 ${name} 调用失败，请检查网络或稍后再试${suffix}`);
+  }
+
+  if (error instanceof Error && error.message) {
+    return error;
+  }
+
+  return new Error(rawMessage || `云函数 ${name} 调用失败`);
 }
 
 function invokeFunction(name, data, timeout) {
@@ -83,7 +103,8 @@ function callFunction(name, data, options = {}) {
             return;
           }
 
-          reject(error);
+          console.warn('[cloud] callFunction failed:', name, error);
+          reject(normalizeCloudCallError(name, error));
         });
     };
 
