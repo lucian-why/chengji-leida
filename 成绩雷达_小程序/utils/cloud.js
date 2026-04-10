@@ -1,3 +1,4 @@
+const APP_ID = 'wx07532e8f45b25fe6';
 const ENV_ID = 'chengjiguanjia-1g1twvrkd736c880';
 
 let initialized = false;
@@ -12,6 +13,7 @@ function initCloud() {
   try {
     wx.cloud.init({
       env: ENV_ID,
+      appid: APP_ID,
       traceUser: true
     });
     initialized = true;

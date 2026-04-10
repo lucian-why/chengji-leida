@@ -1,6 +1,7 @@
 const tcb = require('@cloudbase/node-sdk');
 const { analyzePrompt } = require('./prompts/analyze');
 const { inputParsePrompt } = require('./prompts/inputParse');
+const { chatPrompt } = require('./prompts/chat');
 
 const app = tcb.init({
   env: process.env.CLOUDBASE_ENV_ID || tcb.SYMBOL_CURRENT_ENV,
@@ -34,6 +35,10 @@ exports.main = async (event = {}) => {
 
     if (action === 'inputParse') {
       return await handleInputParse(data);
+    }
+
+    if (action === 'chat') {
+      return await handleChat(data);
     }
 
     return { code: 400, message: '不支持的 AI action' };
@@ -445,4 +450,46 @@ function parseSubjectsLocally(text, subjectHints = []) {
 
 function escapeRegExp(text) {
   return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function handleChat(data = {}) {
+  const messages = Array.isArray(data.messages) ? data.messages : [];
+
+  if (messages.length === 0) {
+    return { code: 400, message: '消息列表不能为空' };
+  }
+
+  // 限制消息数量，避免 token 过长
+  const limitedMessages = messages.slice(-42);
+
+  // 如果没有 system 消息，插入 chatPrompt
+  const hasSystemMessage = limitedMessages.some(m => m.role === 'system');
+  const finalMessages = hasSystemMessage
+    ? limitedMessages
+    : [{ role: 'system', content: chatPrompt }, ...limitedMessages];
+
+  try {
+    const text = await generateWithAI(finalMessages, {
+      temperature: 0.5,
+      maxTokens: 600
+    });
+
+    if (!String(text || '').trim()) {
+      throw new Error('AI 没有返回有效对话内容');
+    }
+
+    return {
+      code: 0,
+      data: {
+        text: String(text).trim(),
+        source: AI_API_KEY && AI_BASE_URL ? 'custom-openai-compatible' : 'cloudbase-ai'
+      }
+    };
+  } catch (error) {
+    console.error('[ai_service] chat error:', error);
+    return {
+      code: 500,
+      message: normalizeAIError(error) || 'AI 对话失败，请稍后再试'
+    };
+  }
 }
