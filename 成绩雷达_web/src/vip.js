@@ -25,6 +25,8 @@ export const LIMITS = {
     aiChatDaily: 2,
     maxProfiles: 2,
     recycleBinRestore: false,
+    vipAiAnalysisDaily: 30,
+    vipAiChatDaily: 50,
 };
 
 // ==================== 内部工具 ====================
@@ -92,7 +94,11 @@ function _saveVipState(state) {
 export function isVip(user) {
     // 优先使用传入的用户信息
     if (user) {
-        if (user.role === 'vip' || user.isAdmin) return true;
+        // admin 永久 VIP
+        if (user.role === 'admin' || user.isAdmin) return true;
+        // 旧版 role='vip' 也视为永久 VIP（兼容历史数据）
+        if (user.role === 'vip') return true;
+        // 新版按到期时间判断
         if (user.vipExpireAt && new Date(user.vipExpireAt).getTime() > Date.now()) return true;
     }
 
@@ -110,7 +116,7 @@ export function isVip(user) {
 }
 
 /**
- * 设置 VIP 状态（邀请码兑换后调用）
+ * 设置 VIP 状态（兑换码兑换后调用）
  */
 export function setVipStatus({ isVip, expireAt }) {
     _saveVipState({ isVip: !!isVip, expireAt: expireAt || null });
@@ -124,14 +130,16 @@ export function setVipStatus({ isVip, expireAt }) {
  * @returns {{ allowed: boolean, reason?: string, used?: number, limit?: number }}
  */
 export function checkLimit(type, currentUsage) {
+    const userIsVip = isVip();
+
     switch (type) {
         case 'aiAnalysis': {
             const record = _getQuotaRecord('aiAnalysis');
-            const limit = LIMITS.aiAnalysisDaily;
+            const limit = userIsVip ? LIMITS.vipAiAnalysisDaily : LIMITS.aiAnalysisDaily;
             if (record.count >= limit) {
                 return {
                     allowed: false,
-                    reason: `今日 AI 分析次数已用完（${limit}/${limit}）`,
+                    reason: userIsVip ? `为了防止恶意调用，VIP 每日 AI 分析最高限制为 ${limit} 次，您今日已达上限。` : `今日 AI 分析次数已用完（${limit}/${limit}）`,
                     used: record.count,
                     limit
                 };
@@ -141,11 +149,11 @@ export function checkLimit(type, currentUsage) {
 
         case 'aiChat': {
             const record = _getQuotaRecord('aiChat');
-            const limit = LIMITS.aiChatDaily;
+            const limit = userIsVip ? LIMITS.vipAiChatDaily : LIMITS.aiChatDaily;
             if (record.count >= limit) {
                 return {
                     allowed: false,
-                    reason: `今日 AI 对话次数已用完（${limit}轮/${limit}）`,
+                    reason: userIsVip ? `为了防止恶意调用，VIP 每日 AI 对话最高限制为 ${limit} 轮，您今日已达上限。` : `今日 AI 对话次数已用完（${limit}轮/${limit}）`,
                     used: record.count,
                     limit
                 };
@@ -154,6 +162,7 @@ export function checkLimit(type, currentUsage) {
         }
 
         case 'profileCount': {
+            if (userIsVip) return { allowed: true, used: currentUsage, limit: Infinity };
             const limit = LIMITS.maxProfiles;
             if (currentUsage >= limit) {
                 return {
@@ -167,6 +176,7 @@ export function checkLimit(type, currentUsage) {
         }
 
         case 'recycleBinRestore': {
+            if (userIsVip) return { allowed: true };
             if (!LIMITS.recycleBinRestore) {
                 return {
                     allowed: false,
@@ -191,7 +201,13 @@ export function consumeQuota(type) {
     record.count += 1;
     _saveQuotaRecord(type, record);
 
-    const limit = type === 'aiChat' ? LIMITS.aiChatDaily : LIMITS.aiAnalysisDaily;
+    const userIsVip = isVip();
+    let limit;
+    if (type === 'aiChat') {
+        limit = userIsVip ? LIMITS.vipAiChatDaily : LIMITS.aiChatDaily;
+    } else {
+        limit = userIsVip ? LIMITS.vipAiAnalysisDaily : LIMITS.aiAnalysisDaily;
+    }
     return Math.max(0, limit - record.count);
 }
 
@@ -221,27 +237,27 @@ export function getQuotaOverview() {
     };
 }
 
-// ==================== 邀请码系统（云端校验，一码一人） ====================
+// ==================== 兑换码系统（云端校验，一码一人） ====================
 
 /**
- * 兑换邀请码 — 调用云函数完成校验 + 激活
+ * 兑换 VIP 兑换码 — 调用云函数完成校验 + 激活
  * 校验逻辑全部在服务端，前端只负责传参和更新本地缓存
  *
- * @param {string} code — 用户输入的邀请码
+ * @param {string} code — 用户输入的兑换码
  * @returns {Promise<{ success: boolean, reason?: string, expireAt?: string|null }>}
  */
-export async function redeemInviteCode(code) {
+export async function redeemVipCode(code) {
     if (!code || !code.trim()) {
-        return { success: false, reason: '请输入邀请码' };
+        return { success: false, reason: '请输入兑换码' };
     }
 
     try {
         const user = await getCurrentUser();
         if (!user?.id) {
-            return { success: false, reason: '请先登录后再兑换邀请码' };
+            return { success: false, reason: '请先登录后再兑换' };
         }
 
-        const result = await callFunction('redeemInviteCode', {
+        const result = await callFunction('redeemVipCode', {
             code: code.trim().toUpperCase(),
             userId: user.id,
         });
@@ -251,17 +267,17 @@ export async function redeemInviteCode(code) {
         }
 
         // 云端已激活成功，更新本地 VIP 缓存
-        const expireAt = result.data?.expireAt || result.data?.vipExpireAt || null;
+        const expireAt = result.data?.vipExpireAt || null;
         setVipStatus({ isVip: true, expireAt });
 
         // 同步云端 VIP 字段到本地用户对象
         if (expireAt) user.vipExpireAt = expireAt;
-        user.role = 'vip';
+        user.role = result.data?.role || 'month';
 
         return { success: true, expireAt };
 
     } catch (error) {
-        console.warn('[vip] 兑换邀请码失败:', error?.message || error);
+        console.warn('[vip] 兑换码失败:', error?.message || error);
         return { success: false, reason: error?.message || '网络异常，请稍后再试' };
     }
 }

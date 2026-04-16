@@ -17,3 +17,10 @@ cloud-functions-upload/
 成绩雷达_web/.env.local
 成绩雷达_小程序/miniprogram_npm/
 成绩雷达_小程序/node_modules/
+
+# 兑换码生成相关临时文件
+*兑换码_*.txt
+gen_codes.py
+generate_more_codes.py
+vip_codes.json
+vip_codes_new.json

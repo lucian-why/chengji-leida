@@ -773,6 +773,35 @@ Page({
     }
   },
 
+  async handleWxGetPhoneNumber(e) {
+    const phoneCode = (e.detail && e.detail.code) || '';
+    try {
+      this.setData({ authSubmitting: true });
+      this._setAuthStatus('正在微信登录...', 'pending');
+      await auth.wxLogin(phoneCode);
+      this._syncAuthState();
+
+      const user = auth.getCurrentUser();
+      if (user && user.id) {
+        const { hasOrphans, orphanProfiles, orphanExamCount } = storage.detectOrphanProfiles(user.id);
+        if (hasOrphans) {
+          const profileNames = orphanProfiles.map(p => p.name).join('、');
+          this._showOrphanDataDialog(profileNames, orphanExamCount, user.id);
+        }
+      }
+
+      await autoSync.syncAfterLogin();
+      this._refreshAIStatus();
+      this._setAuthStatus('登录成功', 'success');
+      wx.showToast({ title: '登录成功', icon: 'success' });
+      setTimeout(() => this.closeAuthModal(), 500);
+    } catch (error) {
+      this._setAuthStatus(error.message || '微信登录失败', 'error');
+    } finally {
+      this.setData({ authSubmitting: false });
+    }
+  },
+
   async submitAuth() {
     const mode = this.data.authMode;
     const account = this.data.authAccount;
@@ -1127,31 +1156,31 @@ Page({
   async submitInviteCode() {
     const code = (this.data.inviteCode || '').trim();
     if (!code) {
-      wx.showToast({ title: '请输入邀请码', icon: 'none' });
+      wx.showToast({ title: '请输入兑换码', icon: 'none' });
       return;
     }
 
     try {
       this.setData({ inviteCodeBusy: true, inviteCodeMessage: '', inviteCodeMessageType: '' });
-      const result = await vip.redeemInviteCode(code);
+      const result = await vip.redeemVipCode(code);
 
       if (result.success) {
         this._syncAuthState();
         this.setData({
-          inviteCodeMessage: '🎉 VIP 激活成功！已解锁全部功能',
+          inviteCodeMessage: '🎉 兑换成功！',
           inviteCodeMessageType: 'success',
           inviteCode: ''
         });
-        wx.showToast({ title: 'VIP 激活成功', icon: 'success' });
+        wx.showToast({ title: '兑换成功', icon: 'success' });
       } else {
         this.setData({
-          inviteCodeMessage: result.reason || '邀请码无效',
+          inviteCodeMessage: result.reason || '兑换码无效',
           inviteCodeMessageType: 'error'
         });
       }
     } catch (err) {
       this.setData({
-        inviteCodeMessage: '激活失败，请稍后重试',
+        inviteCodeMessage: '兑换失败，请稍后重试',
         inviteCodeMessageType: 'error'
       });
     } finally {

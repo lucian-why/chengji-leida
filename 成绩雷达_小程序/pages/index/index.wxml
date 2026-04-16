@@ -320,15 +320,15 @@ module.exports.getRateClass = function(score) {
       </view>
     </view>
 
-    <!-- 邀请码 -->
+    <!-- 兑换码 -->
     <view class="card" wx:if="{{!isVip}}">
-      <view class="card-title">邀请码</view>
-      <view class="setting-desc">输入邀请码可激活 VIP，解锁无限 AI 分析、更多档案和回收站恢复等功能。</view>
+      <view class="card-title">兑换码</view>
+      <view class="setting-desc">输入兑换码可激活 VIP，解锁无限 AI 分析、更多档案和回收站恢复等功能。</view>
       <view class="invite-code-row">
-        <input class="form-input invite-code-input" placeholder="请输入邀请码"
+        <input class="form-input invite-code-input" placeholder="请输入兑换码"
           value="{{inviteCode}}" bindinput="onInviteCodeInput" maxlength="32" />
         <view class="setting-btn green {{inviteCodeBusy ? 'is-disabled' : ''}}"
-          bindtap="submitInviteCode">{{inviteCodeBusy ? '验证中...' : '激活'}}</view>
+          bindtap="submitInviteCode">{{inviteCodeBusy ? '兑换中...' : '兑换'}}</view>
       </view>
       <view class="invite-code-msg {{inviteCodeMessageType}}" wx:if="{{inviteCodeMessage}}">
         {{inviteCodeMessage}}
@@ -786,6 +786,19 @@ module.exports.getRateClass = function(score) {
         </view>
       </block>
 
+      <!-- 微信一键登录 -->
+      <view class="auth-wx-login-area" wx:if="{{authMode === 'login'}}">
+        <view class="auth-divider">
+          <view class="auth-divider-line"></view>
+          <text class="auth-divider-text">其他方式</text>
+          <view class="auth-divider-line"></view>
+        </view>
+        <button class="auth-wx-login-btn" open-type="getPhoneNumber" bindgetphonenumber="handleWxGetPhoneNumber">
+          <text class="auth-wx-icon">👤</text>
+          <text>微信一键登录</text>
+        </button>
+      </view>
+
       <!-- 提交按钮 -->
       <view class="auth-submit-area">
         <view class="btn btn-primary auth-submit-btn {{authSubmitting ? 'disabled' : ''}}" bindtap="handleAuthSubmit">
@@ -817,7 +830,7 @@ module.exports.getRateClass = function(score) {
     </view>
     <view class="modal-body">
       <view class="form-group">
-        <input class="form-input" placeholder="输入新昵称" maxlength="20" value="{{nicknameValue}}" bindinput="onNicknameInput" focus="{{true}}" />
+        <input type="nickname" class="form-input" placeholder="输入新昵称" maxlength="20" value="{{nicknameValue}}" bindinput="onNicknameInput" bindblur="onNicknameInput" focus="{{true}}" />
       </view>
     </view>
     <view class="modal-footer">
