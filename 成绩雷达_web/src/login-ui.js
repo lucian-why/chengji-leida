@@ -173,7 +173,7 @@ function ensureLoginUi() {
         authBar.className = 'auth-status-bar hidden';
         authBar.innerHTML = `
             <div class="auth-status-main">
-                <span class="auth-status-label" id="authStatusLabel">云端账户</span>
+                <span class="auth-status-label" id="authStatusLabel">我的账号</span>
                 <span class="auth-status-value" id="authStatusValue">未登录</span>
                 <span class="auth-sync-status hidden" id="authSyncStatus"></span>
             </div>
